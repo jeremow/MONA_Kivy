@@ -1,7 +1,9 @@
-# This is a sample Python script.
+# -*- coding: utf-8 -*-
 
-# Press Maj+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+# MONA - MONitoring App for MONgolian Stations of the IAG
+# Created by Jérémy Hraman, Davaa
+# Date: 23-03-2021
+# Last Update: 23-03-2021
 
 
 def print_hi(name):
@@ -12,5 +14,3 @@ def print_hi(name):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/

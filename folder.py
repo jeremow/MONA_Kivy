@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# SERVER POPUP LAYOUT
+# FOLDER LAYOUT
 # Author: Jérémy Hraman
 # Date: 23-03-2021
 # Last Update: 23-03-2021
@@ -21,10 +21,10 @@ from kivy.uix.label import Label
 #         pass
 
 
-class ServerWindow(FloatLayout):
+class FolderWindow(FloatLayout):
 
     def __init__(self, *args, **kwargs):
-        super(ServerWindow, self).__init__(**kwargs)
-        info = args[0]
-        main_title = Label(text='MONA - SERVER', font_size=60, pos_hint={'center_x': .5, 'center_y': .5})
+        super(FolderWindow, self).__init__(**kwargs)
+        path = args[0]
+        main_title = Label(text='MONA - FOLDER', font_size=60, pos_hint={'center_x': .5, 'center_y': .5})
         self.add_widget(main_title)

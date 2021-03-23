@@ -20,6 +20,7 @@ from kivy.uix.pagelayout import PageLayout
 from kivy.uix.gridlayout import GridLayout
 
 from server import *
+from folder import *
 
 
 kivy.require('2.0.0')
@@ -30,11 +31,11 @@ class Connection(FloatLayout):
     def __init__(self, **kwargs):
         super(Connection, self).__init__(**kwargs)
 
-        logo = Image(source='css/logo.jpg', pos_hint={'center_x': .3, 'center_y': .7})
-        main_title = Label(text='MONA', font_size=60, pos_hint={'center_x': .6, 'center_y': .7})
-        subtitle = Label(text='MONitoring App for MONgolian Stations of IAG',
+        self.logo = Image(source='css/logo.jpg', pos_hint={'center_x': .3, 'center_y': .7})
+        self.main_title = Label(text='MONA', font_size=60, pos_hint={'center_x': .6, 'center_y': .7})
+        self.subtitle = Label(text='MONitoring App for MONgolian Stations of IAG',
                          font_size=14, pos_hint={'center_x': .6, 'center_y': .65})
-        footer = Label(text='v0.1 - Developed by Davaa and Jérémy Hraman',
+        self.footer = Label(text='v0.1 - Developed by Davaa and Jérémy Hraman',
                        font_size=14, pos_hint={'center_x': .5, 'center_y': .05})
 
         self.server_btn = Button(text='CONNECT TO SERVER', size_hint=(.25, .15),
@@ -56,13 +57,13 @@ class Connection(FloatLayout):
         self.folder_input = False
         self.file_input = False
 
-        self.add_widget(logo)
-        self.add_widget(main_title)
-        self.add_widget(subtitle)
+        self.add_widget(self.logo)
+        self.add_widget(self.main_title)
+        self.add_widget(self.subtitle)
         self.add_widget(self.server_btn)
         self.add_widget(self.folder_btn)
         self.add_widget(self.files_btn)
-        self.add_widget(footer)
+        self.add_widget(self.footer)
 
     # def delete_connect_widgets(self):
     #     if self.server_input is not False:
@@ -110,9 +111,37 @@ class Connection(FloatLayout):
         popup.open()
 
     def connect_to_folder(self, obj):
-        self.delete_connect_widgets()
-        self.folder_input = TextInput(text="0.0.0.0:8000",multiline=False)
-        self.add_widget(self.server_input)
+        layout = FloatLayout()
+
+        folder_info = TextInput(text="/path/to/dir/", multiline=False, size_hint=(.9, .3),
+                                pos_hint={'center_x': .5, 'center_y': .6})
+        connect_btn = Button(text="Connect", size_hint=(.4, .3),
+                             pos_hint={'center_x': .25, 'center_y': .25})
+        close_btn = Button(text="Cancel", size_hint=(.4, .3),
+                           pos_hint={'center_x': .75, 'center_y': .25})
+
+        layout.add_widget(folder_info)
+        layout.add_widget(connect_btn)
+        layout.add_widget(close_btn)
+
+        # Instantiate the modal popup and display
+        popup = Popup(title='Folder connection',
+                      content=layout,
+                      size_hint=(None, None), size=(300, 200))
+        popup.open()
+
+        # Attach close button press with popup.dismiss action
+
+        connect_btn.bind(on_release=lambda info: self.open_folder_window(path=folder_info.text))
+        close_btn.bind(on_press=popup.dismiss)
+
+    def open_folder_window(self, path):
+        layout = FolderWindow(path)
+        popup = Popup(title='MONA - Folder {}'.format(path),
+                      content=layout,
+                      size_hint=(1, 1))
+        popup.open()
+
 
     def upload_files(self, obj):
         pass

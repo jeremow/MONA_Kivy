@@ -25,6 +25,10 @@ class ServerWindow(FloatLayout):
 
     def __init__(self, *args, **kwargs):
         super(ServerWindow, self).__init__(**kwargs)
-        info = args[0]
-        main_title = Label(text='MONA - SERVER', font_size=60, pos_hint={'center_x': .5, 'center_y': .5})
-        self.add_widget(main_title)
+        info = args[0].split(':')
+        try:
+            self.ip_address = info[0]
+            self.port = info[1]
+        except IndexError:
+            error_title = Label(text='Wrong syntax of IP\n Press escape to correct.', font_size=60, pos_hint={'center_x': .5, 'center_y': .5})
+            self.add_widget(error_title)

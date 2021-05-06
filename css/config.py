@@ -1,5 +1,6 @@
 from kivy.lang import Builder
-from kivy.core.window import Window
+# from kivy.core.window import Window
+
 css = """
 <Widget>:
     font_size: dp(20)

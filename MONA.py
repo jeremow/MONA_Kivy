@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # MONA - MONitoring App for MONgolian Stations of the IAG
-# Created by Jérémy Hraman, Davaa
+# Created by Jérémy Hraman
 # Date: 23-03-2021
 # Last Update: 23-03-2021
 
@@ -34,6 +34,13 @@ kivy.require('2.0.0')
 
 
 class Connection(FloatLayout):
+    """
+    Class Connection for MONA. First window you see when running the App.
+    Contains 3 different types of connection:
+        - server: through an IP and a port
+        - folder: through a arch of folder and files
+        - file: just one file
+    """
 
     def __init__(self, **kwargs):
         super(Connection, self).__init__(**kwargs)
@@ -64,9 +71,9 @@ class Connection(FloatLayout):
                            pos_hint={'x': .6875, 'y': .2})
         self.files_btn.bind(on_release=self.upload_files)
 
-        self.server_input = False
-        self.folder_input = False
-        self.file_input = False
+        self._server_input = False
+        self._folder_input = False
+        self._file_input = False
 
         self.add_widget(self.logo)
         self.add_widget(self.main_title)
@@ -99,10 +106,13 @@ class Connection(FloatLayout):
         # Attach close button press with popup.dismiss action
 
         connect_btn.bind(on_release=lambda info: self.open_server_window(info=server_info.text))
+
+        self.server_input = True
+
         close_btn.bind(on_press=popup.dismiss)
 
     def open_server_window(self, info):
-        layout = ServerWindow(info)
+        layout = ServerWindow(info, cols=2)
         popup = Popup(title='MONA - Server - {}'.format(info),
                       content=layout,
                       size_hint=(1, 1))
@@ -186,6 +196,9 @@ class Connection(FloatLayout):
 
         # Attach close button press with popup.dismiss action
         connect_btn.bind(on_release=lambda info: self.open_folder_window(path=folder_info.path))
+
+        self.folder_input = True
+
         close_btn.bind(on_press=popup.dismiss)
 
     def open_folder_window(self, path):
@@ -195,9 +208,29 @@ class Connection(FloatLayout):
                       size_hint=(1, 1))
         popup.open()
 
-
     def upload_files(self, obj):
         pass
+
+    def open_file_window(self, path):
+
+        self.file_input = True
+        pass
+
+    # Properties
+    def _set_server_input(self, value):
+        self._server_input = value
+
+    server_input = property(None, _set_server_input)
+
+    def _set_folder_input(self, value):
+        self._folder_input = value
+
+    folder_input = property(None, _set_folder_input)
+
+    def _set_file_input(self, value):
+        self._file_input = value
+
+    file_input = property(None, _set_file_input)
 
 
 class MONA(App):

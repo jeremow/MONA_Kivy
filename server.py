@@ -9,6 +9,8 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader, TabbedPanelItem
 from interface import *
+from kivy.graphics.instructions import Canvas
+from kivy.graphics import Rectangle, Color
 
 # class ServerSeisComP3:
 #
@@ -59,26 +61,29 @@ class ServerWindow(GridLayout):
             #                            [ ... ]]
 
             # TREE SELECTION OF STATIONS
-            tree_selection = ScrollView(size_hint=(.2, .5), pos=(0, 0))
+            tree_selection = ScrollView(size_hint=(.2, .65), pos=(0, 0))
             stations_widget, self.stations_active_list = stations_tab(server_info, network_list)
             tree_selection.add_widget(stations_widget)
             self.add_widget(tree_selection)
 
             # TAB CENTRAL
-            tab_panel_central = TabbedPanel(do_default_tab=False, tab_pos='top_mid', tab_width=150)
+            tab_panel_central = TabbedPanel(do_default_tab=False, tab_pos='top_mid', tab_width=150, size_hint=(.8,.65))
 
             tab_time_central = TabbedPanelItem(text='TIME SIGNAL')
 
-            layout = GridLayout(cols=1)
-            self.text_label = Label(text=str(self.stations_active_list), size_hint=(1, 0.5))
+            self.layout = BoxLayout(orientation='vertical')
+            self.button = Button(text="Update list of stations", size=(300, 40), size_hint=(None, None),
+                                 pos_hint={'center_x': .5})
             self.t_curves = t_curves_tab(self.stations_active_list)
-            self.button = Button(text="Update", size_hint=(1, 0.5), pos=(100, 100))
-            layout.add_widget(self.text_label)
-            layout.add_widget(self.t_curves)
-            layout.add_widget(self.button)
+
+            self.layout.add_widget(self.button)
+            self.layout.add_widget(self.t_curves)
+
+            # Allow the update of the active_list of stations: the operation of doing it automatically is way more
+            # complicated than just push a button with a callback on_release.
             self.button.bind(on_release=self.on_release_button)
 
-            tab_time_central.add_widget(layout)
+            tab_time_central.add_widget(self.layout)
 
             tab_map_central = TabbedPanelItem(text='MAP')
             tab_map_central.add_widget(map_tab())
@@ -88,6 +93,66 @@ class ServerWindow(GridLayout):
 
             self.add_widget(tab_panel_central)
 
+            state_layout = ScrollView(size_hint=(.2, .35))
+
+            states = [['Temperature Digitizer', '45°C', 0],
+                      ['Temperature Outside', '-2°C', 1],
+                      ['Intrusion', 'No', 1],
+                      ['Solar Panels', 'Yes', 1],
+                      ['Voltage', '12.2V', 1],
+                      ['Current', '1.2A', 0]]
+
+            self.state_station = 'SONA0'
+            states_tree = StateTreeView(title='States of {}'.format(self.state_station), state_list=states)
+            state_layout.add_widget(states_tree)
+            self.add_widget(state_layout)
+
+            # LAYOUT CENTRAL BOTTOM FOR ALARMS AND PSD
+            layout_central_bottom = TabbedPanel(do_default_tab=False, tab_pos='top_mid', tab_width=150,
+                                                size_hint=(.8, .35), pos_hint={'center_x': .5, 'center_y': .5})
+
+            tab_alarms_layout = TabbedPanelItem(text='Alarms')
+
+            tab_alarms_grid = GridLayout(cols=2)
+
+
+
+            self.alarms_list = [['2021-04-23 12:07:12', 'SONA0 - Temp Digitizer - Too Hot'],
+                                ['2021-04-23 12:02:42', 'SONA0 - Current - Too High'],
+                                ['2021-04-22 08:24:53', 'ALFM - Current - Too High']]
+
+            self.c_alarms_list = [['2021-04-20 21:16:55', 'SONA0 - Temperature Digitizer - Too Hot'],
+                                  ['2021-04-22 16:36:42', 'SONA0 - Current - Too High'],
+                                  ['2021-04-22 16:36:42', 'SONA0 - Current - Too High']]
+
+            # ALARMS IN PROGRESS SCROLL TO BOTTOM VIEW
+            in_progress_scroll_layout = ScrollView(size_hint=(.5, .9))
+            in_progress_alarms_tree = AlarmTreeView(title='Alarms in progress', alarms_list=self.alarms_list,
+                                                    check=True)
+            in_progress_scroll_layout.add_widget(in_progress_alarms_tree)
+            tab_alarms_grid.add_widget(in_progress_scroll_layout)
+
+            # ALARMS COMPLETED SCROLL TO BOTTOM VIEW
+            completed_scroll_layout = ScrollView(size_hint=(.5, .9))
+            completed_alarms_tree = AlarmTreeView(title='Alarms completed', alarms_list=self.c_alarms_list, check=False)
+            completed_scroll_layout.add_widget(completed_alarms_tree)
+            tab_alarms_grid.add_widget(completed_scroll_layout)
+
+            tab_alarms_layout.add_widget(tab_alarms_grid)
+
+            complete_alarm_btn = Button(text='Finish checked alarms', size_hint=(.5, .1))
+            tab_alarms_grid.add_widget(complete_alarm_btn)
+
+            layout_central_bottom.add_widget(tab_alarms_layout)
+
+            tab_PSD = TabbedPanelItem(text='PSD')
+            layout_central_bottom.add_widget(tab_PSD)
+
+            self.add_widget(layout_central_bottom)
+
+
     def on_release_button(self, btn):
-        self.text_label.text = str(self.stations_active_list)
-        print(self.text_label.text)
+        # To update the curves, we have to remove the widget and add it again just after
+        self.layout.remove_widget(self.t_curves)
+        self.t_curves = t_curves_tab(self.stations_active_list)
+        self.layout.add_widget(self.t_curves)

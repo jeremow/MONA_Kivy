@@ -66,7 +66,7 @@ class Connection(FloatLayout):
         else:
             self.folder_btn.bind(on_release=self.connect_to_folder)
 
-        self.files_btn = Button(text='UPLOAD FILES', size_hint=(.25, .15),
+        self.files_btn = Button(text='CONNECT DIGITIZER', size_hint=(.25, .15),
                            background_color=(.3, .6, .7, 1),
                            pos_hint={'x': .6875, 'y': .2})
         self.files_btn.bind(on_release=self.upload_files)

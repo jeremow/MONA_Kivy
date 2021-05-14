@@ -20,6 +20,7 @@ from kivy_garden.mapview import MapView
 from kivy.uix.tabbedpanel import TabbedPanel
 
 # Used for selection of time view
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.actionbar import *
 
 # Graphics
@@ -44,17 +45,32 @@ def map_tab():
 
 
 def t_curves_tab(active_list):
-    t_layout = BoxLayout(orientation="vertical")
-    t_figure = MatplotlibFigure([1, 2, 3, 4, 5], [1, 2, 3, 4, 5], title='Mabite')
-    t_layout.add_widget(t_figure.nav.actionbar)
-    t_layout.add_widget(t_figure.fig.canvas)
 
-    # for station in active_list:
-    #     pass
+    # add the scroll view inside of the central tab of t_curves, only accept 1 widget, we have to create a BoxLayout to
+    # put all the other figures
+    t_layout = ScrollView(size_hint=(1, 1), pos=(0, 0), do_scroll_x=True)
 
+    # t_graph_layout will store all the MLP figures with update every 5 seconds (?)
+    # t_layout.bind(minimum_height=t_layout.setter('height'))
 
+    dict_row_min = {}
 
-    t_curves = Label(text=str(active_list))
+    for i in range(0, len(active_list)):
+        dict_row_min[2*i] = 45
+        dict_row_min[2*i+1] = 200
+
+    print(dict_row_min)
+
+    graph_layout = GridLayout(cols=1, size_hint_y=None, rows_minimum=dict_row_min)
+    graph_layout.bind(minimum_height=graph_layout.setter('height'))
+
+    for station in active_list:
+        t_figure = MatplotlibFigure([1, 2, 3, 4, 5], [1, 2, 3, 4, 5], title=station)
+        graph_layout.add_widget(t_figure.nav.actionbar)
+        graph_layout.add_widget(t_figure.fig.canvas)
+
+    t_layout.add_widget(graph_layout)
+
     return t_layout
 
 
@@ -171,3 +187,122 @@ class NetworkTreeView(TreeView):
 class TabCentral(TabbedPanel):
     def __init__(self, **kwargs):
         super(TabCentral, self).__init__(self, **kwargs)
+
+
+# ALARM VIEW BOTTOM CENTRAL
+class MyNodeAlarm(BoxLayout):
+    """
+    Class MyNodeChannel allow to check boxes and returning information of which channel is active or not.
+    It differs from MyNodeOther which doesn't include this checkbox functionality.
+    """
+    def __init__(self, **kwargs):
+        self.text = kwargs.pop('text', 'None')
+        self.alarms_list = kwargs.pop('alarms_list')
+        self.check = kwargs.pop('check')
+        super(MyNodeAlarm, self).__init__(**kwargs)
+        self.orientation = 'horizontal'
+
+        # make height reasonable
+        self.size_hint_y = None
+        self.height = dp(25)
+
+        # make the parts of the node
+        # align text of label to the right side for Channel because of alignment of the checkboxes
+        self.label = Label(text=self.text, size_hint_x=0.9, halign="left")
+        self.label.bind(size=self.label.setter('text_size'))
+        self.add_widget(self.label)
+
+        if self.check:
+            self.checkbox = CheckBox(size_hint_x=0.1, color=(1, 1, 1, 3.5)) # alpha=3.5 to make it more visible
+            self.add_widget(self.checkbox)
+            self.checkbox.bind(active=self.on_checkbox_active)
+
+    def on_checkbox_active(self, checkbox_obj, is_active):
+        if is_active:
+            self.alarms_list.append(self.text)
+        else:
+            try:
+                self.alarms_list.remove(self.text)
+            except ValueError:
+                pass
+
+
+class MyTreeNodeAlarm(MyNodeAlarm, TreeViewNode):
+    """
+    Double Heritage of MyNodeChannel and TreeViewNode
+    """
+    pass
+
+
+class AlarmTreeView(TreeView):
+    """
+    Class NetworkTreeView. Main Heritage from TreeView
+    """
+    def __init__(self, title, alarms_list, check):
+        # To manage with the ScrollView, we have to put size_hint=(1, None) because theScrollView will decide of the
+        # dimensions of the y-axis and we fully put the TreeView into the x-axis
+        super(AlarmTreeView, self).__init__(root_options=dict(text=title), size_hint_x=1, size_hint_y=None)
+        self.alarms_list = alarms_list
+        self.check = check
+        # This parameter allow the Scrollview to work :
+        self.bind(minimum_height=self.setter('height'))
+
+        # Here is the representation of each node of our TreeView : Network / Station / Channel
+        for alarm in self.alarms_list:
+            alarm_type = '{} | {}'.format(alarm[0], alarm[1])
+            self.add_node(MyTreeNodeAlarm(text=alarm_type, alarms_list=self.alarms_list, check=self.check))
+
+
+# XAT VIEW LEFT BOTTOM
+class MyNodeState(BoxLayout):
+    """
+    Class MyNodeChannel allow to check boxes and returning information of which channel is active or not.
+    It differs from MyNodeOther which doesn't include this checkbox functionality.
+    """
+    def __init__(self, **kwargs):
+        self.text = kwargs.pop('text', 'None')
+
+        super(MyNodeState, self).__init__(**kwargs)
+        self.orientation = 'horizontal'
+
+        # make height reasonable
+        self.size_hint_y = None
+        self.height = dp(25)
+
+        # make the parts of the node
+        # align text of label to the right side for Channel because of alignment of the checkboxes
+        self.label = Label(text=self.text, size_hint_x=0.9, halign="left", markup=True)
+        self.label.bind(size=self.label.setter('text_size'))
+        self.add_widget(self.label)
+
+
+class MyTreeNodeState(MyNodeState, TreeViewNode):
+    """
+    Double Heritage of MyNodeChannel and TreeViewNode
+    """
+    pass
+
+
+class StateTreeView(TreeView):
+    """
+    Class NetworkTreeView. Main Heritage from TreeView
+    """
+    def __init__(self, title, state_list):
+        # To manage with the ScrollView, we have to put size_hint=(1, None) because theScrollView will decide of the
+        # dimensions of the y-axis and we fully put the TreeView into the x-axis
+        super(StateTreeView, self).__init__(root_options=dict(text=title), size_hint_x=1, size_hint_y=None)
+        self.state_list = state_list
+        # This parameter allow the Scrollview to work :
+        self.bind(minimum_height=self.setter('height'))
+
+        # Here is the representation of each node of our TreeView : Network / Station / Channel
+        for state in self.state_list:
+            # state[0]: type of state
+            # state[1]: state
+            # state[2]: 1 or 0 (normal or problem for color)
+            if state[2] == 1:
+                color = '00ff00'
+            else:
+                color = 'ff0000'
+            state_text = '{0}: [color={2}]{1}[/color]'.format(state[0], state[1], color)
+            self.add_node(MyTreeNodeState(text=state_text))

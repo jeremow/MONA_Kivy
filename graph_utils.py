@@ -18,6 +18,9 @@ from kivy.uix.button import Button
 
 import matplotlib.pyplot as plt
 
+from kivy.uix.widget import Widget
+from kivy.graphics import Rectangle, Color
+
 
 class MatplotlibFigure:
     """
@@ -44,7 +47,7 @@ class MatplotlibFigure:
 
         self.ax.set_xlabel(self.x_label)
         self.ax.set_ylabel(self.y_label)
-        self.ax.set_title(self.title)
+        # self.ax.set_title(self.title)
 
         self.ax.plot(self.x, self.y)
 
@@ -93,6 +96,25 @@ class MatplotlibFigure:
     def on_close(self, event):
         print('closing figure')
 
+
+class Separator(Widget):
+
+    def __init__(self, **kwargs):
+        super(Separator, self).__init__(**kwargs)
+
+        # Arranging Canvas
+        with self.canvas:
+            Color(0, 0, 0)  # set the colour
+
+            # Seting the size and position of canvas
+            self.rect = Rectangle(pos_hint={'center_x': .5, 'center_y': .5},
+                                  size=(50, 5))
+            self.bind(pos_hint=self.update_rect)
+    #
+    #         # update function which makes the canvas adjustable.
+    def update_rect(self, *args):
+        self.rect.pos_hint = self.pos
+    #     self.rect.size = self.size
 #     def.
 #
 # N = 5

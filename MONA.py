@@ -7,7 +7,7 @@
 
 import kivy
 
-import css.config
+import config.config
 
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout

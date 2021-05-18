@@ -82,16 +82,18 @@ def f_curves_tab():
 
 
 # STATIONS_TAB CLASSES 
-class MyNodeChannel(BoxLayout):
+class MyNodeNetwork(BoxLayout):
     """
-    Class MyNodeChannel allow to check boxes and returning information of which channel is active or not.
-    It differs from MyNodeOther which doesn't include this checkbox functionality.
+    Class MyNodeNetwork allow to check boxes and returning information of which channel is active or not.
     """
     def __init__(self, **kwargs):
-        text = kwargs.pop('text', 'None')
-        self.active_list = kwargs.pop('active_list')
-        self.full_name = kwargs.pop('full_name')
-        super(MyNodeChannel, self).__init__(**kwargs)
+        self.text = kwargs.pop('text', 'None')
+        self.network = kwargs.pop('network', 'None')
+        self.active_list = kwargs.pop('active_list', 'None')
+        self.full_name = kwargs.pop('full_name', 'None')
+        self.check = kwargs.pop('check')
+        self.is_station = kwargs.pop('is_station')
+        super(MyNodeNetwork, self).__init__(**kwargs)
         self.orientation = 'horizontal'
 
         # make height reasonable
@@ -100,15 +102,17 @@ class MyNodeChannel(BoxLayout):
 
         # make the parts of the node
         # align text of label to the right side for Channel because of alignment of the checkboxes
-        self.label = Label(text=text, size_hint_x=0.2, halign="right")
+        if self.check:
+            self.label = Label(text=self.text, size_hint_x=0.2, halign="right")
+        else:
+            self.label = Label(text=self.text, size_hint_x=0.2, halign="center")
         self.label.bind(size=self.label.setter('text_size'))
-        self.checkbox = CheckBox(size_hint_x=0.1, color=(1, 1, 1, 3.5))  # alpha=3.5 to make it more visible
-
-        # add the parts to the BoxLayout
         self.add_widget(self.label)
-        self.add_widget(self.checkbox)
 
-        self.checkbox.bind(active=self.on_checkbox_active)
+        if self.check:
+            self.checkbox = CheckBox(size_hint_x=0.1, color=(1, 1, 1, 3.5))  # alpha=3.5 to make it more visible
+            self.add_widget(self.checkbox)
+            self.checkbox.bind(active=self.on_checkbox_active)
 
     def on_checkbox_active(self, checkbox_obj, is_active):
         if is_active:
@@ -120,37 +124,9 @@ class MyNodeChannel(BoxLayout):
                 pass
 
 
-class MyNodeOther(BoxLayout):
+class MyTreeNodeNetwork(MyNodeNetwork, TreeViewNode):
     """
-    Class MyNodeOther is just present to display the networks and stations.
-    It differs from MyNodeChannel which includes the checkbox functionality.
-    """
-    def __init__(self, **kwargs):
-        text = kwargs.pop('text', 'None')
-        super(MyNodeOther, self).__init__(**kwargs)
-        self.orientation = 'horizontal'
-
-        # make height reasonable
-        self.size_hint_y = None
-        self.height = dp(25)
-
-        # make the parts of the node
-        self.label = Label(text=text, size_hint_x=0.2)
-
-        # add the parts to the BoxLayout
-        self.add_widget(self.label)
-
-
-class MyTreeNodeChannel(MyNodeChannel, TreeViewNode):
-    """
-    Double Heritage of MyNodeChannel and TreeViewNode
-    """
-    pass
-
-
-class MyTreeNodeOther(MyNodeOther, TreeViewNode):
-    """
-    Double Heritage of MyNodeOther and TreeViewNode
+    Double Heritage of MyNodeNetwork and TreeViewNode
     """
     pass
 
@@ -170,16 +146,18 @@ class NetworkTreeView(TreeView):
         # Here is the representation of each node of our TreeView : Network / Station / Channel
         for network in network_list:
             net_name = network[0]
-            network_node = self.add_node(MyTreeNodeOther(text=net_name))
+            network_node = self.add_node(MyTreeNodeNetwork(text=net_name, check=False, is_station=False))
 
             for station in network[1:]:
                 station_name = station[0]
-                station_node = self.add_node(MyTreeNodeOther(text=station_name), network_node)
+                station_node = self.add_node(MyTreeNodeNetwork(text=station_name, network=net_name,
+                                                               check=False, is_station=True), network_node)
 
                 for channel in station[1]:
                     full_name = net_name + '.' + station_name + '.' + channel
-                    self.add_node(MyTreeNodeChannel(text=channel, full_name=full_name,
-                                                    active_list=active_list), station_node)
+                    self.add_node(MyTreeNodeNetwork(text=channel, full_name=full_name,
+                                                    active_list=active_list, check=True, is_station=False), station_node)
+
 
 
 # TAB CENTRAL : MAP AND T_CURVES
@@ -299,8 +277,8 @@ class StateTreeView(TreeView):
         for state in self.state_list:
             # state[0]: type of state
             # state[1]: state
-            # state[2]: 1 or 0 (normal or problem for color)
-            if state[2] == 1:
+            # state[2]: 0 or 1 (normal or problem for color)
+            if state[2] == 0:
                 color = '00ff00'
             else:
                 color = 'ff0000'

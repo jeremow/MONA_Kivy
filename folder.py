@@ -17,7 +17,7 @@ class FolderWindow(FloatLayout):
         self.folder = args[0]
         self.list_files = self.get_tree(self.folder)
         self.rel_path(self.folder)
-
+        print(self.list_files)
         main_title = Label(text='MONA - FOLDER', font_size=60, pos_hint={'center_x': .5, 'center_y': .5})
         self.add_widget(main_title)
 

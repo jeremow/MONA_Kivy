@@ -1,5 +1,13 @@
 from kivy.lang import Builder
-# from kivy.core.window import Window
+from kivy.core.window import Window
+# from kivy.config import Config
+from screeninfo import get_monitors
+Window.position = 'custom'
+Window.left = 45
+Window.top = 45
+
+width, height = get_monitors()[0].width, get_monitors()[0].height
+Window.size = (width-90, height-90)
 
 css = """
 <Widget>:
@@ -8,6 +16,3 @@ css = """
 """
 
 Builder.load_string(css)
-
-# Window.fullscreen = 'auto'
-

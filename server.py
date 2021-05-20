@@ -5,16 +5,11 @@
 # Date: 23-03-2021
 # Last Update: 23-03-2021
 
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.label import Label
-from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelHeader, TabbedPanelItem
+from kivy.uix.tabbedpanel import TabbedPanelItem
 from interface import *
-from kivy.graphics.instructions import Canvas
-from kivy.graphics import Rectangle, Color
 from kivy.clock import Clock
 
 import xml.etree.ElementTree as ET
-import os
 
 
 # class ServerSeisComP3:
@@ -63,21 +58,20 @@ class ServerWindow(GridLayout):
             try:
                 config_server = ET.parse('config/server/{}.xml'.format(self.server_info.replace(':', '.')))
                 config_server_root = config_server.getroot()
-
+                net_nb = 0
                 for network in config_server_root:
                     network_name = network.attrib['name']
-                    station_list = []
+                    network_list.append([network_name])
                     for station in config_server_root.findall("./network[@name='{0}']/station".format(network_name)):
                         station_name = station.attrib['name']
-                        station_list.append(station_name)
                         channel_list = []
                         for channel in config_server_root.findall("./network[@name='{0}']/"
                                                                   "station[@name='{1}']/"
                                                                   "channel".format(network_name, station_name)):
                             channel_list.append(channel.attrib['name'])
 
-                        station_list.append(channel_list)
-                    network_list.append([network_name, station_list])
+                        network_list[net_nb].append([station_name, channel_list])
+                    net_nb += 1
             except FileNotFoundError:
                 print('Config file of server missing.')
 
@@ -97,18 +91,22 @@ class ServerWindow(GridLayout):
             tab_panel_central = TabbedPanel(do_default_tab=False, tab_pos='top_mid', tab_width=150, size_hint=(.8, .65))
 
             tab_time_central = TabbedPanelItem(text='TIME SIGNAL')
-
+            # self.t_figures will store the reference of the class MatplotlibFigure to avoid creating again
+            # MatplotlibFigure for nothing when updating the list of stations from the NetworkTreeView to the t_curves
+            # tab.
+            self.t_figures = []
             self.layout = BoxLayout(orientation='vertical')
             self.update_time_button = Button(text="Update list of stations", size=(300, 40),
                                              size_hint=(None, None), pos_hint={'center_x': .5})
-            self.t_curves = t_curves_tab(self.stations_active_list)
+
+            self.t_curves = t_curves_tab(self.stations_active_list, self.t_figures)
 
             self.layout.add_widget(self.update_time_button)
             self.layout.add_widget(self.t_curves)
 
             # Allow the update of the active_list of stations: the operation of doing it automatically is way more
             # complicated than just push a button with a callback on_release.
-            self.update_time_button.bind(on_release=self.on_release_button)
+            self.update_time_button.bind(on_release=self.on_release_t_curves)
 
             tab_time_central.add_widget(self.layout)
 
@@ -146,21 +144,23 @@ class ServerWindow(GridLayout):
 
             # ALARMS IN PROGRESS SCROLL TO BOTTOM VIEW
             self.in_progress_scroll_layout = ScrollView(size_hint=(.5, .9))
+            self.nc_alarms_list_checked = []
             self.in_progress_alarms_tree = AlarmTreeView(title='Alarms in progress', alarms_list=self.nc_alarms_list,
-                                                         check=True)
+                                                         check=True, check_list=self.nc_alarms_list_checked)
             self.in_progress_scroll_layout.add_widget(self.in_progress_alarms_tree)
             tab_alarms_grid.add_widget(self.in_progress_scroll_layout)
 
             # ALARMS COMPLETED SCROLL TO BOTTOM VIEW
             self.completed_scroll_layout = ScrollView(size_hint=(.5, .9))
             self.completed_alarms_tree = AlarmTreeView(title='Alarms completed', alarms_list=self.c_alarms_list,
-                                                       check=False)
+                                                       check=False, check_list=[])
             self.completed_scroll_layout.add_widget(self.completed_alarms_tree)
             tab_alarms_grid.add_widget(self.completed_scroll_layout)
 
             tab_alarms_layout.add_widget(tab_alarms_grid)
 
             self.complete_alarm_btn = Button(text='Finish checked alarms', size_hint=(.5, .1))
+            self.complete_alarm_btn.bind(on_release=self.complete_alarms)
             tab_alarms_grid.add_widget(self.complete_alarm_btn)
 
             layout_central_bottom.add_widget(tab_alarms_layout)
@@ -175,19 +175,24 @@ class ServerWindow(GridLayout):
             Clock.schedule_interval(self.update_alarms, 30)
             Clock.schedule_interval(self.update_curves, 10)
 
-    def on_release_button(self, btn):
+    def on_release_t_curves(self, btn):
         # To update the number of stations in curves, we have to remove the widget and add it again just after
+
         self.layout.remove_widget(self.t_curves)
-        self.t_curves = t_curves_tab(self.stations_active_list)
+        self.t_curves.children[0].clear_widgets()
+        self.t_curves = t_curves_tab(self.stations_active_list, self.t_figures)
         self.layout.add_widget(self.t_curves)
 
     def on_selected_node(self, dt):
         if self.selected_node is not self.stations_widget.selected_node:
             self.selected_node = self.stations_widget.selected_node
-            if self.selected_node.is_station:
-                self.state_network = self.selected_node.network
-                self.state_station = self.selected_node.text
-                Clock.schedule_once(self.update_states)
+            try:
+                if self.selected_node.is_station:
+                    self.state_network = self.selected_node.network
+                    self.state_station = self.selected_node.text
+                    Clock.schedule_once(self.update_states)
+            except AttributeError:
+                pass
 
     def update_states(self, dt):
         self.states = []
@@ -205,6 +210,7 @@ class ServerWindow(GridLayout):
         self.state_layout.add_widget(self.states_tree)
 
     def update_curves(self, dt):
+
         pass
 
     def update_alarms(self, dt):
@@ -220,22 +226,24 @@ class ServerWindow(GridLayout):
                 alarm_name = alarm.attrib['station'] + ' - ' + \
                              alarm.attrib['state'] + ' - ' + \
                              alarm.attrib['detail']
-                alarm_datetime = alarm.attrib['datetime'][1:5] + '-' + alarm.attrib['datetime'][5:7] + '-' + \
-                                 alarm.attrib['datetime'][7:9] + ' ' + alarm.attrib['datetime'][10:12] + ':' + \
-                                 alarm.attrib['datetime'][12:14] + ':' + alarm.attrib['datetime'][14:]
+                alarm_dt = alarm.attrib['datetime']
+                alarm_datetime = alarm_dt[1:5] + '-' + alarm_dt[5:7] + '-' + \
+                                 alarm_dt[7:9] + ' ' + alarm_dt[10:12] + ':' + \
+                                 alarm_dt[12:14] + ':' + alarm_dt[14:]
 
-                self.nc_alarms_list.append([alarm_datetime, alarm_name])
+                self.nc_alarms_list.append([alarm_datetime, alarm_name, alarm.attrib])
 
             # display the 20 last completed alarms
             for alarm in alarms_server_root.findall("./completed/alarm")[-20:]:
                 alarm_name = alarm.attrib['station'] + ' - ' + \
                              alarm.attrib['state'] + ' - ' + \
                              alarm.attrib['detail']
-                alarm_datetime = alarm.attrib['datetime'][1:5] + '-' + alarm.attrib['datetime'][5:7] + '-' + \
-                                 alarm.attrib['datetime'][7:9] + ' ' + alarm.attrib['datetime'][10:12] + ':' + \
-                                 alarm.attrib['datetime'][12:14] + ':' + alarm.attrib['datetime'][14:]
+                alarm_dt = alarm.attrib['datetime']
+                alarm_datetime = alarm_dt[1:5] + '-' + alarm_dt[5:7] + '-' + \
+                                 alarm_dt[7:9] + ' ' + alarm_dt[10:12] + ':' + \
+                                 alarm_dt[12:14] + ':' + alarm_dt[14:]
 
-                self.c_alarms_list.append([alarm_datetime, alarm_name])
+                self.c_alarms_list.append([alarm_datetime, alarm_name, alarm.attrib])
 
         except FileNotFoundError:
             pass
@@ -246,9 +254,31 @@ class ServerWindow(GridLayout):
         self.completed_scroll_layout.remove_widget(self.completed_alarms_tree)
 
         self.in_progress_alarms_tree = AlarmTreeView(title='Alarms in progress', alarms_list=self.nc_alarms_list,
-                                                     check=True)
+                                                     check=True, check_list=self.nc_alarms_list_checked)
         self.completed_alarms_tree = AlarmTreeView(title='Alarms completed', alarms_list=self.c_alarms_list,
-                                                   check=False)
+                                                   check=False, check_list=[])
 
         self.in_progress_scroll_layout.add_widget(self.in_progress_alarms_tree)
         self.completed_scroll_layout.add_widget(self.completed_alarms_tree)
+
+    def complete_alarms(self, btn):
+        try:
+            alarms_server = ET.parse('log/server/{}_alarms.xml'.format(self.server_info.replace(':', '.')))
+            alarms_server_root = alarms_server.getroot()
+            for checked_alarm in self.nc_alarms_list_checked:
+                self.nc_alarms_list_checked.remove(checked_alarm)
+                alarm_to_move = alarms_server_root.find("./ongoing/alarm[@id='{}']".format(checked_alarm['id']))
+                alarms_server_root[1][-1].tail = '\n\t\t'
+                alarms_server_root[1].text = "\n\t\t"
+                alarms_server_root[1].append(alarm_to_move)
+                alarms_server_root[0].remove(alarm_to_move)
+                alarms_server_root[0][-1].tail = "\n\t"
+                alarms_server_root[0].text = "\n\t\t"
+                alarms_server_root[0].tail = '\n\n\t'
+
+            alarms_server.write('log/server/{}_alarms.xml'.format(self.server_info.replace(':', '.')))
+
+            Clock.schedule_once(self.update_alarms)
+
+        except FileNotFoundError:
+            pass

@@ -15,6 +15,7 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 from obspy.core import read
 from obspy.core import UTCDateTime
@@ -31,20 +32,33 @@ class MatplotlibFigure(BoxLayout):
     def __init__(self, **kwargs):
 
         self.name = kwargs.pop('name', '')
+        split_name = self.name.split('.')
+        self.network = split_name[0]
+        self.station = split_name[1]
+        self.channel = split_name[2]
+
         self.title = kwargs.pop('title', '')
         self.x_label = kwargs.pop('x_label', 'x')
         self.y_label = kwargs.pop('y_label', 'y')
+        self.client = kwargs.pop('client', None)
+
+        self.starttime = kwargs.pop('starttime', None)
 
         super(MatplotlibFigure, self).__init__()
 
         self.orientation = 'vertical'
-        self.fig, self.ax = plt.subplots()
+        self.fig, self.ax = plt.subplots(constrained_layout=True)
+
+        self.auto_moving_x = True
+        self.auto_moving_y = True
         self.fig.clf()
 
-        stream = read('RD.SONA1..SHZ.D.2020.001')
-        stream.plot(color='blue', grid_color=(0, 1, 1), transparent=True,
-                    fig=self.fig, dpi=200,
-                    starttime=stream[0].stats.starttime, endtime=stream[0].stats.starttime+20)
+        if self.client is not None:
+            self.stream = self.client.get_waveforms(self.network, self.station, '??', self.channel,
+                                                    self.starttime-10, self.starttime)
+        self.stream[0].plot(color='blue', grid_color=(0, 1, 1), transparent=True,
+                            fig=self.fig, dpi=100,
+                            starttime=self.stream[0].stats.starttime, endtime=self.stream[0].stats.endtime)
         self.fig.patch.set_fill(False)
         self.fig.tight_layout()
 
@@ -52,11 +66,13 @@ class MatplotlibFigure(BoxLayout):
         self.fig.axes[0].tick_params(axis='both', which='major', labelsize=14)
         self.fig.axes[0].tick_params(axis='both', which='minor', labelsize=14)
 
-        data = self.fig.axes[0].psd
-        print(data)
-
-        self.xmin, self.xmax = self.fig.axes[0].get_xlim()
         self.ymin, self.ymax = self.fig.axes[0].get_ylim()
+
+        self.xmin = self.stream[0].stats.starttime.matplotlib_date
+        self.xmax = (self.stream[0].stats.starttime + 30).matplotlib_date
+        self.delta_x = 30
+        self.fig.axes[0].set_xlim(self.xmin, self.xmax)
+        self.fig.canvas.draw()
 
         # EVENTUAL EVENTS THAT CAN BE CAUGHT
         # self.fig.canvas.mpl_connect('button_press_event', self.on_press)
@@ -73,6 +89,7 @@ class MatplotlibFigure(BoxLayout):
         # CREATION OF NAV TOOLBAR DIRECTLY IN MLPFIGURE
         self.nav_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=.2)
 
+        self.reset_btn = Button(text="Reset axis", size_hint=(None, 1))
         self.zoomin_x = Button(background_normal='css/icons/png/zoomin_x.png',
                                background_down='css/icons/png/zoomin_x_down.png',
                                border=(0, 0, 0, 0), size=(45, 45), size_hint=(None, 1))
@@ -100,6 +117,7 @@ class MatplotlibFigure(BoxLayout):
                                border=(0, 0, 0, 0), size=(45, 45), size_hint=(None, 1))
 
         self.nav_layout.add_widget(Label(text=self.title, size_hint=(.3, 1)))
+        self.nav_layout.add_widget(self.reset_btn)
         self.nav_layout.add_widget(Label(text='X-axis', size_hint=(.1, 1)))
         self.nav_layout.add_widget(self.zoomin_x)
         self.nav_layout.add_widget(self.zoomout_x)
@@ -111,6 +129,7 @@ class MatplotlibFigure(BoxLayout):
         self.nav_layout.add_widget(self.goup_y)
         self.nav_layout.add_widget(self.godown_y)
 
+        self.reset_btn.bind(on_release=self.on_reset)
         self.zoomin_x.bind(on_release=self.on_zoomin_x)
         self.zoomout_x.bind(on_release=self.on_zoomout_x)
         self.goleft_x.bind(on_release=self.on_goleft_x)
@@ -123,11 +142,46 @@ class MatplotlibFigure(BoxLayout):
         self.add_widget(self.nav_layout)
         self.add_widget(self.fig.canvas)
 
-        # PSD associated
-        self.fig_psd, _ = plt.subplots()
+    def get_data_from_client(self, endtime):
+        self.stream += self.client.get_waveforms(self.network, self.station, '??', self.channel,
+                                                 self.stream[0].stats.endtime, endtime)
+        # TODO: Delete when there is more than 10 minutes
+        self.stream.merge()
+
+    def update_figure(self, endtime):
+        self.fig.clf()
+        self.stream[0].plot(color='blue', grid_color=(0, 1, 1), transparent=True,
+                            fig=self.fig, dpi=100,
+                            starttime=self.stream[0].stats.starttime, endtime=self.stream[0].stats.endtime)
+        if self.auto_moving_x:
+            if endtime - (self.starttime - 10) <= 30:
+                self.xmin = self.stream[0].stats.starttime.matplotlib_date
+                self.xmax = (self.stream[0].stats.starttime + 30).matplotlib_date
+            else:
+                self.xmin = (endtime - 30).matplotlib_date
+                self.xmax = endtime.matplotlib_date
+
+            if self.auto_moving_y:
+                self.ymin, self.ymax = self.fig.axes[0].get_ylim()
+
+        # self.fig.tight_layout()
+        self.fig.axes[0].set_xlim(self.xmin, self.xmax)
+        self.fig.axes[0].set_ylim(self.ymin, self.ymax)
+        self.fig.patch.set_fill(False)
+
+        # size of ticks is defined here (impossible to change it in mplstyle sheet)
+        self.fig.axes[0].tick_params(axis='both', which='major', labelsize=14)
+        self.fig.axes[0].tick_params(axis='both', which='minor', labelsize=14)
+        self.fig.canvas.draw()
+
+    def on_reset(self, btn):
+        self.auto_moving_x = True
+        self.auto_moving_y = True
+        self.update_figure(self.stream[0].stats.endtime)
 
 
     def on_zoomin_x(self, btn):
+        self.auto_moving_x = False
         center = (self.xmax + self.xmin) / 2
         delta = self.xmax - self.xmin
         delta *= 0.92
@@ -138,6 +192,7 @@ class MatplotlibFigure(BoxLayout):
         self.fig.canvas.draw()
 
     def on_zoomout_x(self, btn):
+        self.auto_moving_x = False
         center = (self.xmax + self.xmin) / 2
         delta = self.xmax - self.xmin
         delta *= 1.08
@@ -148,6 +203,7 @@ class MatplotlibFigure(BoxLayout):
         self.fig.canvas.draw()
 
     def on_goleft_x(self, btn):
+        self.auto_moving_x = False
         delta = self.xmax - self.xmin
         delta *= 0.1
         self.xmax -= delta
@@ -156,6 +212,7 @@ class MatplotlibFigure(BoxLayout):
         self.fig.canvas.draw()
 
     def on_goright_x(self, btn):
+        self.auto_moving_x = False
         delta = self.xmax - self.xmin
         delta *= 0.1
         self.xmax += delta
@@ -164,6 +221,7 @@ class MatplotlibFigure(BoxLayout):
         self.fig.canvas.draw()
 
     def on_zoomin_y(self, btn):
+        self.auto_moving_y = False
         center = (self.ymax+self.ymin)/2
         delta = self.ymax-self.ymin
         delta *= 0.92
@@ -174,6 +232,7 @@ class MatplotlibFigure(BoxLayout):
         self.fig.canvas.draw()
 
     def on_zoomout_y(self, btn):
+        self.auto_moving_y = False
         center = (self.ymax + self.ymin) / 2
         delta = self.ymax - self.ymin
         delta *= 1.08
@@ -184,6 +243,7 @@ class MatplotlibFigure(BoxLayout):
         self.fig.canvas.draw()
 
     def on_goup_y(self, btn):
+        self.auto_moving_y = False
         delta = self.ymax - self.ymin
         delta *= 0.1
         self.ymax += delta
@@ -192,6 +252,7 @@ class MatplotlibFigure(BoxLayout):
         self.fig.canvas.draw()
 
     def on_godown_y(self, btn):
+        self.auto_moving_y = False
         delta = self.ymax - self.ymin
         delta *= 0.1
         self.ymax -= delta

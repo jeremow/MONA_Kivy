@@ -89,7 +89,7 @@ class Connection(FloatLayout):
     def connect_to_server(self, server_btn):
         layout = FloatLayout()
 
-        server_info = TextInput(text="0.0.0.0:8000", multiline=False, size_hint=(.9, .3),
+        server_info = TextInput(text="rtserver.ipgp.fr", multiline=False, size_hint=(.9, .3),
                                 pos_hint={'center_x': .5, 'center_y': .6})
         connect_btn = Button(text="Connect", size_hint=(.4, .3),
                              pos_hint={'center_x': .25, 'center_y': .25})

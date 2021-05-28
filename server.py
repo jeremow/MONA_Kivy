@@ -43,11 +43,10 @@ class ServerWindow(GridLayout):
             self.server_info = args[0]
             info = self.server_info.split(':')
             self.ip_address = info[0]
-            self.ip_address_split = self.ip_address.split('.')
-            if len(self.ip_address_split) != 4:
-                raise IndexError
-
-            self.port = info[1]
+            try:
+                self.port = info[1]
+            except IndexError:
+                self.port = '18000'
 
         except IndexError:
             # Display the error message in case of an error in the writing of the IP
@@ -57,15 +56,12 @@ class ServerWindow(GridLayout):
         else:
             # Main Interface of MONA imported from interface.py. Interface.py is a group of widgets useable to display
             # all different modules we want. You can choose the size, position here.
-            try:
-                self.client = ServerSeisComP3(self.ip_address, self.port)
-            except SeedLinkException:
-                print('Impossible to connect to server')
-            # Here's an example of a network structure to test with the server 0.0.0.0:8000
+
+            self.client = ServerSeisComP3(self.ip_address, self.port)
 
             network_list = []
             try:
-                config_server = ET.parse('config/server/{}.xml'.format(self.server_info.replace(':', '.')))
+                config_server = ET.parse('config/server/{}.xml'.format(self.ip_address + '.' + self.port))
                 config_server_root = config_server.getroot()
                 net_nb = 0
                 for network in config_server_root:
@@ -108,7 +104,7 @@ class ServerWindow(GridLayout):
             self.update_time_button = Button(text="Update list of stations", size=(300, 40),
                                              size_hint=(None, None), pos_hint={'center_x': .5})
 
-            self.t_curves = t_curves_tab(self.stations_active_list, self.t_figures)
+            self.t_curves = t_curves_tab(self.stations_active_list, self.t_figures, client=self.client)
 
             self.layout.add_widget(self.update_time_button)
             self.layout.add_widget(self.t_curves)
@@ -189,7 +185,7 @@ class ServerWindow(GridLayout):
 
         self.layout.remove_widget(self.t_curves)
         self.t_curves.children[0].clear_widgets()
-        self.t_curves = t_curves_tab(self.stations_active_list, self.t_figures)
+        self.t_curves = t_curves_tab(self.stations_active_list, self.t_figures, client=self.client)
         self.layout.add_widget(self.t_curves)
 
     def on_selected_node(self, dt):
@@ -206,7 +202,7 @@ class ServerWindow(GridLayout):
     def update_states(self, dt):
         self.states = []
         try:
-            states_server = ET.parse('log/server/{}_states.xml'.format(self.server_info.replace(':', '.')))
+            states_server = ET.parse('log/server/{}_states.xml'.format(self.ip_address + '.' + self.port))
             states_server_root = states_server.getroot()
             for state in states_server_root.findall("./network[@name='{0}']/station[@name='{1}']/"
                                                     "state".format(self.state_network, self.state_station)):
@@ -219,15 +215,24 @@ class ServerWindow(GridLayout):
         self.state_layout.add_widget(self.states_tree)
 
     def update_curves(self, dt):
+        self.endtime = UTCDateTime()
+        Clock.schedule_once(self.get_data)
+        Clock.schedule_once(self.update_figures, 5)
 
-        pass
+    def get_data(self, dt):
+        for figure in self.t_figures:
+            figure.get_data_from_client(self.endtime)
+
+    def update_figures(self, dt):
+        for figure in self.t_figures:
+            figure.update_figure(self.endtime)
 
     def update_alarms(self, dt):
         # nc_alarms_list: non-completed alarms list ; c_alarms_list: completed one
         self.nc_alarms_list = []
         self.c_alarms_list = []
         try:
-            alarms_server = ET.parse('log/server/{}_alarms.xml'.format(self.server_info.replace(':', '.')))
+            alarms_server = ET.parse('log/server/{}_alarms.xml'.format(self.ip_address + '.' + self.port))
             alarms_server_root = alarms_server.getroot()
 
             # display all the ongoing alarms

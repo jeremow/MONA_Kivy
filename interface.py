@@ -34,9 +34,10 @@ def map_tab():
     return MapView(lat=46.7734832, lon=103.2187417, zoom=6)
 
 
-def t_curves_tab(active_list, t_figures):
+def t_curves_tab(active_list, t_figures, **kwargs):
     # add the scroll view inside of the central tab of t_curves, only accept 1 widget, we have to create a BoxLayout to
     # put all the other figures
+    client = kwargs.pop('client', None)
     t_layout = ScrollView(size_hint=(1, 1), pos=(0, 0), do_scroll_x=True)
 
     # The dict with rows is here to adapt the graphs to
@@ -66,8 +67,12 @@ def t_curves_tab(active_list, t_figures):
     del figures_to_delete
 
     # now we create the new figures which were added afterwards and add it to the list of figures
+    starttime = UTCDateTime()
     for station in leftovers_active_list:
-        t_figure = MatplotlibFigure(name=station, title=station)
+        if client is not None:
+            t_figure = MatplotlibFigure(name=station, title=station, client=client, starttime=starttime)
+        else:
+            t_figure = MatplotlibFigure(name=station, title=station)
         t_figures.append(t_figure)
         graph_layout.add_widget(t_figure)
     del leftovers_active_list

@@ -1,0 +1,15 @@
+axes.facecolor : (0, 0, 0, 0)
+figure.facecolor : (0, 0, 0, 0)
+grid.color : white
+xtick.color: white
+ytick.color: white
+xtick.labelsize: 32
+ytick.labelsize: 32
+axes.edgecolor: white
+axes.labelcolor: white
+boxplot.boxprops.color: white
+boxplot.capprops.color: white
+boxplot.flierprops.color: white
+boxplot.flierprops.markeredgecolor: white
+boxplot.whiskerprops.color: white
+patch.edgecolor: white

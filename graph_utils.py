@@ -8,7 +8,7 @@
 # Last Update: 03-05-2021
 
 import matplotlib
-matplotlib.use('module://kivy.garden.matplotlib.backend_kivy')
+matplotlib.use('Kivy')
 
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -16,7 +16,7 @@ from kivy.uix.label import Label
 
 import matplotlib.pyplot as plt
 
-from obspy import read, read_inventory
+from obspy.core import read
 from obspy.core import UTCDateTime
 
 # Style sheet created for MatplotlibFigure which implements colors for a dark background and everything
@@ -47,6 +47,13 @@ class MatplotlibFigure(BoxLayout):
                     starttime=stream[0].stats.starttime, endtime=stream[0].stats.starttime+20)
         self.fig.patch.set_fill(False)
         self.fig.tight_layout()
+
+        # size of ticks is defined here (impossible to change it in mplstyle sheet)
+        self.fig.axes[0].tick_params(axis='both', which='major', labelsize=14)
+        self.fig.axes[0].tick_params(axis='both', which='minor', labelsize=14)
+
+        data = self.fig.axes[0].psd
+        print(data)
 
         self.xmin, self.xmax = self.fig.axes[0].get_xlim()
         self.ymin, self.ymax = self.fig.axes[0].get_ylim()
@@ -113,10 +120,12 @@ class MatplotlibFigure(BoxLayout):
         self.goup_y.bind(on_release=self.on_goup_y)
         self.godown_y.bind(on_release=self.on_godown_y)
 
-        # self.nav =
         self.add_widget(self.nav_layout)
-
         self.add_widget(self.fig.canvas)
+
+        # PSD associated
+        self.fig_psd, _ = plt.subplots()
+
 
     def on_zoomin_x(self, btn):
         center = (self.xmax + self.xmin) / 2

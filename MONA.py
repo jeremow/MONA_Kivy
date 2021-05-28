@@ -45,42 +45,45 @@ class Connection(FloatLayout):
     def __init__(self, **kwargs):
         super(Connection, self).__init__(**kwargs)
 
+        # WELCOME WINDOW
         self.logo = Image(source='css/logo.jpg', pos_hint={'center_x': .3, 'center_y': .7})
         self.main_title = Label(text='MONA', font_size=60, pos_hint={'center_x': .6, 'center_y': .7})
         self.subtitle = Label(text='MONitoring App for MONgolian Stations of IAG',
-                         font_size=14, pos_hint={'center_x': .6, 'center_y': .65})
-        self.footer = Label(text='v0.1 - Developed by Naraa and Jérémy Hraman',
-                       font_size=14, pos_hint={'center_x': .5, 'center_y': .05})
+                              font_size=14, pos_hint={'center_x': .6, 'center_y': .65})
+        self.footer = Label(text='v0.1 - Developed by Jérémy Hraman',
+                            font_size=14, pos_hint={'center_x': .5, 'center_y': .05})
 
         self.server_btn = Button(text='CONNECT TO SERVER', size_hint=(.25, .15),
-                            background_color=(.3, .6, .7, 1),
-                            pos_hint={'x': .0625, 'y': .2})
+                                 background_color=(.3, .6, .7, 1),
+                                 pos_hint={'x': .0625, 'y': .2})
         self.server_btn.bind(on_release=self.connect_to_server)
 
         self.folder_btn = Button(text='CONNECT TO FOLDER', size_hint=(.25, .15),
-                            background_color=(.3, .6, .7, 1),
-                            pos_hint={'x': .375, 'y': .2})
+                                 background_color=(.3, .6, .7, 1),
+                                 pos_hint={'x': .375, 'y': .2})
 
+        # to connect with a folder, we have to take care of the OS because Python does not understand the division of
+        # partition in Windows and in UNIX that's useless
         if platform.system() == 'Windows':
             self.folder_btn.bind(on_release=self.select_volume)
         else:
             self.folder_btn.bind(on_release=self.connect_to_folder)
 
-        self.files_btn = Button(text='CONNECT DIGITIZER', size_hint=(.25, .15),
-                           background_color=(.3, .6, .7, 1),
-                           pos_hint={'x': .6875, 'y': .2})
-        self.files_btn.bind(on_release=self.upload_files)
+        self.digitizer_btn = Button(text='CONNECT DIGITIZER', size_hint=(.25, .15),
+                                    background_color=(.3, .6, .7, 1),
+                                    pos_hint={'x': .6875, 'y': .2})
+        self.digitizer_btn.bind(on_release=self.connect_to_digitizer)
 
         self._server_input = False
         self._folder_input = False
-        self._file_input = False
+        self._digitizer_input = False
 
         self.add_widget(self.logo)
         self.add_widget(self.main_title)
         self.add_widget(self.subtitle)
         self.add_widget(self.server_btn)
         self.add_widget(self.folder_btn)
-        self.add_widget(self.files_btn)
+        self.add_widget(self.digitizer_btn)
         self.add_widget(self.footer)
 
     def connect_to_server(self, server_btn):
@@ -208,12 +211,12 @@ class Connection(FloatLayout):
                       size_hint=(1, 1))
         popup.open()
 
-    def upload_files(self, obj):
+    def connect_to_digitizer(self, obj):
         pass
 
-    def open_file_window(self, path):
+    def open_digitizer_window(self, path):
 
-        self.file_input = True
+        self.digitizer_input = True
         pass
 
     # Properties
@@ -227,10 +230,10 @@ class Connection(FloatLayout):
 
     folder_input = property(None, _set_folder_input)
 
-    def _set_file_input(self, value):
-        self._file_input = value
+    def _set_digitizer_input(self, value):
+        self._digitizer_input = value
 
-    file_input = property(None, _set_file_input)
+    digitizer_input = property(None, _set_digitizer_input)
 
 
 class MONA(App):

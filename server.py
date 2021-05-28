@@ -11,18 +11,24 @@ from kivy.clock import Clock
 
 import xml.etree.ElementTree as ET
 
+from obspy.clients.seedlink.easyseedlink import EasySeedLinkClient
 
-# class ServerSeisComP3:
-#
-#     def __init__(self, ip_address, port):
-#         self.ip_address = ip_address
-#         self.port = port
-#
-#     def connect_to_server(self):
-#         pass
-#
-#     def get_stations(self):
-#         pass
+
+class ServerSeisComP3(EasySeedLinkClient):
+    """
+    ServerSeisComP3 class
+    """
+    def __init__(self, ip_address, port):
+        self.addr_str = ip_address + port
+        super(ServerSeisComP3, self).__init__(self.addr_str)
+        self.ip_address = ip_address
+        self.port = port
+
+    def connect_to_server(self):
+        pass
+
+    def get_stations(self):
+        pass
 
 
 class ServerWindow(GridLayout):
@@ -36,13 +42,12 @@ class ServerWindow(GridLayout):
             self.server_info = args[0]
             info = self.server_info.split(':')
             self.ip_address = info[0]
-            self.ip_address = self.ip_address.split('.')
-            if len(self.ip_address) != 4:
+            self.ip_address_split = self.ip_address.split('.')
+            if len(self.ip_address_split) != 4:
                 raise IndexError
-            else:
-                for i, nb in enumerate(self.ip_address):
-                    self.ip_address[i] = int(nb)
-            self.port = int(info[1])
+
+            self.port = info[1]
+
         except IndexError:
             # Display the error message in case of an error in the writing of the IP
             error_title = Label(text='Wrong syntax of IP\n Press escape to correct.', font_size=60,

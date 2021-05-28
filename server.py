@@ -11,18 +11,19 @@ from kivy.clock import Clock
 
 import xml.etree.ElementTree as ET
 
-from obspy.clients.seedlink.easyseedlink import EasySeedLinkClient
+from obspy.clients.seedlink import Client
+from obspy.clients.seedlink.seedlinkexception import SeedLinkException
 
 
-class ServerSeisComP3(EasySeedLinkClient):
+class ServerSeisComP3(Client):
     """
     ServerSeisComP3 class
     """
     def __init__(self, ip_address, port):
-        self.addr_str = ip_address + port
-        super(ServerSeisComP3, self).__init__(self.addr_str)
         self.ip_address = ip_address
-        self.port = port
+        self.port = int(port)
+        super(ServerSeisComP3, self).__init__(server=self.ip_address, port=self.port)
+
 
     def connect_to_server(self):
         pass
@@ -56,7 +57,10 @@ class ServerWindow(GridLayout):
         else:
             # Main Interface of MONA imported from interface.py. Interface.py is a group of widgets useable to display
             # all different modules we want. You can choose the size, position here.
-
+            try:
+                self.client = ServerSeisComP3(self.ip_address, self.port)
+            except SeedLinkException:
+                print('Impossible to connect to server')
             # Here's an example of a network structure to test with the server 0.0.0.0:8000
 
             network_list = []

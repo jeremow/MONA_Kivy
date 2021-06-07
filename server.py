@@ -6,6 +6,7 @@
 # Last Update: 23-03-2021
 
 from kivy.uix.tabbedpanel import TabbedPanelItem
+from kivy.uix.popup import Popup
 from interface import *
 from kivy.clock import Clock
 
@@ -13,6 +14,10 @@ import xml.etree.ElementTree as ET
 
 from obspy.clients.seedlink import Client
 from obspy.clients.seedlink.seedlinkexception import SeedLinkException
+from obspy import UTCDateTime
+import time
+
+from threading import Thread  # Work with Thread to avoid freezing windows
 
 
 class ServerSeisComP3(Client):
@@ -24,12 +29,23 @@ class ServerSeisComP3(Client):
         self.port = int(port)
         super(ServerSeisComP3, self).__init__(server=self.ip_address, port=self.port)
 
+    def connect_to_server(self, network, station, location, channel, starttime, endtime):
+        time.sleep(1)
+        connection = Popup(title='MONA - Server - {}'.format(self.ip_address),
+                           content=Label(text='Connection in progress'),
+                           size_hint=(.5, .2), auto_dismiss=False)
+        connection.open()
+        try:
+            _ = self.get_waveforms(network, station, location, channel, starttime, endtime)
+            info = Label(text='Connection to Server Successful')
 
-    def connect_to_server(self):
-        pass
+        except SeedLinkException:
+            info = Label(text='Config file is not matching with the SeedLink Server')
 
-    def get_stations(self):
-        pass
+        connection.dismiss()
+        Popup(title='MONA - Server - {}'.format(self.ip_address),
+              content=info,
+              size_hint=(.5, .2)).open()
 
 
 class ServerWindow(GridLayout):
@@ -73,12 +89,32 @@ class ServerWindow(GridLayout):
                         for channel in config_server_root.findall("./network[@name='{0}']/"
                                                                   "station[@name='{1}']/"
                                                                   "channel".format(network_name, station_name)):
-                            channel_list.append(channel.attrib['name'])
+                            if channel.attrib['location'] == '':
+                                channel_list.append(channel.attrib['name'])
+                            else:
+                                channel_list.append(channel.attrib['location'] + '.' + channel.attrib['name'])
 
                         network_list[net_nb].append([station_name, channel_list])
                     net_nb += 1
+
+                s_network = network_list[0][0]
+                s_station = network_list[0][1][0]
+                s_locchan = network_list[0][1][1][0].split('.')
+                if len(s_locchan) == 2:
+                    s_location = s_locchan[0]
+                    s_channel = s_locchan[1]
+                else:
+                    s_location = ''
+                    s_channel = s_locchan[0]
+
+                s_time = UTCDateTime() - 10
+                Thread(target=self.client.connect_to_server,
+                       args=(s_network, s_station, s_location, s_channel, s_time, s_time + 2)).start()
+
             except FileNotFoundError:
                 print('Config file of server missing.')
+            except IndexError:
+                print('Verify the config file, no station found')
 
             # The structure has to be : [[ NETWORK_1, [ STATION_1, [ CHANNEL_1, CHANNEL_2, ...]],
             #                                         [ STATION 2, [ CHANNEL_1, CHANNEL_2, ...]]],
@@ -111,7 +147,8 @@ class ServerWindow(GridLayout):
 
             # Allow the update of the active_list of stations: the operation of doing it automatically is way more
             # complicated than just push a button with a callback on_release.
-            self.update_time_button.bind(on_release=self.on_release_t_curves)
+            # self.update_time_button.bind(on_release=self.on_release_t_curves)
+            self.update_time_button.bind(on_release=self.on_release_t_curves) # test with thread
 
             tab_time_central.add_widget(self.layout)
 
@@ -175,17 +212,44 @@ class ServerWindow(GridLayout):
 
             self.add_widget(layout_central_bottom)
 
+            # on_selected_node_thread = ServerThread(self.on_selected_node, 0.5)
+            # update_states_thread = ServerThread(self.update_states, 30)
+            # update_alarms_thread = ServerThread(self.update_alarms, 30)
+            # update_curves_thread = ServerThread(self.update_curves, 10)
+
+            # self.endtime = UTCDateTime()
+            # update_time_thread = ServerThread(self.update_time, 10)
+            # self.get_data_thread = ServerThread(self.get_data, 10)
+            self.update_figures_thread = ServerThread(self.get_data, self.update_figures, dt=8)
+
+            # on_selected_node_thread.start()
+            # update_states_thread.start()
+            # update_alarms_thread.start()
+            # update_time_thread.start()
+            # self.get_data_thread.start()
+            self.update_figures_thread.start()
+
             Clock.schedule_interval(self.on_selected_node, 0.5)
             Clock.schedule_interval(self.update_states, 30)
             Clock.schedule_interval(self.update_alarms, 30)
-            Clock.schedule_interval(self.update_curves, 10)
+            # Clock.schedule_interval(self.update_curves, 10)
 
     def on_release_t_curves(self, btn):
         # To update the number of stations in curves, we have to remove the widget and add it again just after
 
         self.layout.remove_widget(self.t_curves)
+
+        # self.get_data_thread.terminate()
+        self.update_figures_thread.terminate()
+
         self.t_curves.children[0].clear_widgets()
         self.t_curves = t_curves_tab(self.stations_active_list, self.t_figures, client=self.client)
+
+        # self.get_data_thread = ServerThread(self.get_data, 10)
+        self.update_figures_thread = ServerThread(self.get_data, self.update_figures, dt=8)
+        # self.get_data_thread.start()
+        self.update_figures_thread.start()
+
         self.layout.add_widget(self.t_curves)
 
     def on_selected_node(self, dt):
@@ -214,18 +278,29 @@ class ServerWindow(GridLayout):
         self.states_tree = StateTreeView(title='States of {}'.format(self.state_station), state_list=self.states)
         self.state_layout.add_widget(self.states_tree)
 
-    def update_curves(self, dt):
-        self.endtime = UTCDateTime()
-        Clock.schedule_once(self.get_data)
-        Clock.schedule_once(self.update_figures, 5)
+    # def update_time(self, dt):
+    #     self.endtime = UTCDateTime()
 
-    def get_data(self, dt):
+    def get_data(self, endtime):
         for figure in self.t_figures:
-            figure.get_data_from_client(self.endtime)
+            figure.get_data_from_client(endtime)
 
-    def update_figures(self, dt):
+    def update_figures(self, endtime):
         for figure in self.t_figures:
-            figure.update_figure(self.endtime)
+            figure.update_figure(endtime)
+
+    # def update_curves(self, dt):
+    #     self.endtime = UTCDateTime()
+    #     Clock.schedule_once(self.get_data)
+    #     Clock.schedule_once(self.update_figures, 5)
+    #
+    # def get_data(self, dt):
+    #     for figure in self.t_figures:
+    #         figure.get_data_from_client(self.endtime)
+    #
+    # def update_figures(self, dt):
+    #     for figure in self.t_figures:
+    #         figure.update_figure(self.endtime)
 
     def update_alarms(self, dt):
         # nc_alarms_list: non-completed alarms list ; c_alarms_list: completed one
@@ -296,3 +371,24 @@ class ServerWindow(GridLayout):
 
         except FileNotFoundError:
             pass
+
+
+class ServerThread(Thread):
+    def __init__(self, *functions, dt=0.0):
+        Thread.__init__(self)
+        self.functions = functions
+        self.endtime = UTCDateTime()
+        self.dt = dt
+        self.daemon = True
+        self._running = True
+
+    def terminate(self):
+        self._running = False
+
+    def run(self):
+        while self._running:
+            self.endtime = UTCDateTime()
+            for function in self.functions:
+                function(self.endtime)
+                time.sleep(1.5)
+            time.sleep(self.dt)

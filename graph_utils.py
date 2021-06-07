@@ -15,10 +15,9 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+import numpy as np
+import matplotlib.dates as mdates
 
-from obspy.core import read
-from obspy.core import UTCDateTime
 
 # Style sheet created for MatplotlibFigure which implements colors for a dark background and everything
 plt.style.use('./css/MONA.mplstyle')
@@ -33,9 +32,16 @@ class MatplotlibFigure(BoxLayout):
 
         self.name = kwargs.pop('name', '')
         split_name = self.name.split('.')
-        self.network = split_name[0]
-        self.station = split_name[1]
-        self.channel = split_name[2]
+        if len(split_name) == 4:
+            self.network = split_name[0]
+            self.station = split_name[1]
+            self.location = split_name[2]
+            self.channel = split_name[3]
+        else:
+            self.network = split_name[0]
+            self.station = split_name[1]
+            self.location = ''
+            self.channel = split_name[2]
 
         self.title = kwargs.pop('title', '')
         self.x_label = kwargs.pop('x_label', 'x')
@@ -47,32 +53,52 @@ class MatplotlibFigure(BoxLayout):
         super(MatplotlibFigure, self).__init__()
 
         self.orientation = 'vertical'
-        self.fig, self.ax = plt.subplots(constrained_layout=True)
+        self.fig, self.ax = plt.subplots()
+        # self.fig = plt.figure()
+        # self.ax = self.fig.add_subplot(111)
 
         self.auto_moving_x = True
         self.auto_moving_y = True
         self.fig.clf()
 
         if self.client is not None:
-            self.stream = self.client.get_waveforms(self.network, self.station, '??', self.channel,
+            self.stream = self.client.get_waveforms(self.network, self.station, self.location, self.channel,
                                                     self.starttime-10, self.starttime)
-        self.stream[0].plot(color='blue', grid_color=(0, 1, 1), transparent=True,
-                            fig=self.fig, dpi=100,
-                            starttime=self.stream[0].stats.starttime, endtime=self.stream[0].stats.endtime)
+            self.tr = self.stream[0]
+            # self.stream[0].plot(color='blue', grid_color=(0, 1, 1), transparent=True,
+            #                     fig=self.fig, dpi=100,
+            #                     starttime=self.stream[0].stats.starttime, endtime=self.stream[0].stats.endtime)
+            start = self.tr.stats.starttime.matplotlib_date
+            end = self.tr.stats.endtime.matplotlib_date
+
+            self.t = np.linspace(start, end, self.tr.stats.npts)
+            self.str_plot, = plt.plot(self.t, self.tr.data, 'b-', figure=self.fig)
+
         self.fig.patch.set_fill(False)
-        self.fig.tight_layout()
+
+        self.fig.axes[0].xaxis_date()
+        self.fig.axes[0].get_xaxis().set_major_locator(plt.LinearLocator(5))
+        self.fig.axes[0].get_xaxis().set_major_formatter(mdates.DateFormatter("%Y-%m-%dT%H:%M:%S"))
 
         # size of ticks is defined here (impossible to change it in mplstyle sheet)
         self.fig.axes[0].tick_params(axis='both', which='major', labelsize=14)
         self.fig.axes[0].tick_params(axis='both', which='minor', labelsize=14)
 
+        # self.ax.tick_params(axis='both', which='major', labelsize=14)
+        # self.ax.tick_params(axis='both', which='minor', labelsize=14)
+
         self.ymin, self.ymax = self.fig.axes[0].get_ylim()
+        # self.ymin, self.ymax = self.ax.get_ylim()
 
         self.xmin = self.stream[0].stats.starttime.matplotlib_date
         self.xmax = (self.stream[0].stats.starttime + 30).matplotlib_date
         self.delta_x = 30
         self.fig.axes[0].set_xlim(self.xmin, self.xmax)
+        # self.ax.set_xlim(self.xmin, self.xmax)
         self.fig.canvas.draw()
+
+        # PSD
+        self.sr = self.stream[0].stats.sampling_rate
 
         # EVENTUAL EVENTS THAT CAN BE CAUGHT
         # self.fig.canvas.mpl_connect('button_press_event', self.on_press)
@@ -143,16 +169,28 @@ class MatplotlibFigure(BoxLayout):
         self.add_widget(self.fig.canvas)
 
     def get_data_from_client(self, endtime):
-        self.stream += self.client.get_waveforms(self.network, self.station, '??', self.channel,
-                                                 self.stream[0].stats.endtime, endtime)
-        # TODO: Delete when there is more than 10 minutes
+        old_starttime = self.stream[0].stats.starttime
+        old_endtime = self.stream[0].stats.endtime
+
+        if (old_endtime-old_starttime) >= 30:
+            self.stream.trim(old_starttime+10, old_endtime)
+
+        self.stream += self.client.get_waveforms(self.network, self.station, self.location, self.channel,
+                                                 old_endtime, endtime)
         self.stream.merge()
 
+        self.tr = self.stream[0]
+
+        start = self.tr.stats.starttime.matplotlib_date
+        end = self.tr.stats.endtime.matplotlib_date
+
+        self.t = np.linspace(start, end, self.tr.stats.npts)
+
     def update_figure(self, endtime):
-        self.fig.clf()
-        self.stream[0].plot(color='blue', grid_color=(0, 1, 1), transparent=True,
-                            fig=self.fig, dpi=100,
-                            starttime=self.stream[0].stats.starttime, endtime=self.stream[0].stats.endtime)
+
+        self.str_plot.set_xdata(self.t)
+        self.str_plot.set_ydata(self.tr.data)
+
         if self.auto_moving_x:
             if endtime - (self.starttime - 10) <= 30:
                 self.xmin = self.stream[0].stats.starttime.matplotlib_date
@@ -164,14 +202,9 @@ class MatplotlibFigure(BoxLayout):
             if self.auto_moving_y:
                 self.ymin, self.ymax = self.fig.axes[0].get_ylim()
 
-        # self.fig.tight_layout()
         self.fig.axes[0].set_xlim(self.xmin, self.xmax)
         self.fig.axes[0].set_ylim(self.ymin, self.ymax)
-        self.fig.patch.set_fill(False)
 
-        # size of ticks is defined here (impossible to change it in mplstyle sheet)
-        self.fig.axes[0].tick_params(axis='both', which='major', labelsize=14)
-        self.fig.axes[0].tick_params(axis='both', which='minor', labelsize=14)
         self.fig.canvas.draw()
 
     def on_reset(self, btn):

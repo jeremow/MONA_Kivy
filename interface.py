@@ -7,9 +7,7 @@
 
 # Tree View modules for selection of stations
 from kivy.metrics import dp
-from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.checkbox import CheckBox
-from kivy.uix.label import Label
 from kivy.uix.treeview import TreeView, TreeViewNode
 from kivy.uix.scrollview import ScrollView
 # TODO: add the size scaling with Slider
@@ -22,7 +20,7 @@ from kivy.uix.gridlayout import GridLayout
 
 # Graphics
 from graph_utils import *
-import datetime
+from obspy import UTCDateTime
 
 
 def stations_tab(info, network_list):
@@ -86,7 +84,8 @@ def f_curves_tab():
     pass
 
 
-# STATIONS_TAB CLASSES 
+# STATIONS_TAB CLASSES
+
 class MyNodeNetwork(BoxLayout):
     """
     Class MyNodeNetwork allow to check boxes and returning information of which channel is active or not.
@@ -99,6 +98,7 @@ class MyNodeNetwork(BoxLayout):
         self.check = kwargs.pop('check')
         self.is_station = kwargs.pop('is_station')
         super(MyNodeNetwork, self).__init__(**kwargs)
+
         self.orientation = 'horizontal'
 
         # make height reasonable
@@ -248,6 +248,7 @@ class MyNodeState(BoxLayout):
         self.text = kwargs.pop('text', 'None')
 
         super(MyNodeState, self).__init__(**kwargs)
+
         self.orientation = 'horizontal'
 
         # make height reasonable

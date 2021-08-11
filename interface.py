@@ -73,9 +73,10 @@ def t_curves_tab(active_list, t_figures, **kwargs):
             t_figure = MatplotlibFigure(name=station, title=station)
         t_figures.append(t_figure)
         graph_layout.add_widget(t_figure)
-    del leftovers_active_list
 
     t_layout.add_widget(graph_layout)
+
+    del leftovers_active_list
 
     return t_layout
 

@@ -16,8 +16,11 @@ from obspy.clients.seedlink import Client
 from obspy.clients.seedlink.seedlinkexception import SeedLinkException
 from obspy import UTCDateTime
 import time
+from os import getpid
+from psutil import Process
 
 from threading import Thread  # Work with Thread to avoid freezing windows
+import gc
 
 
 class ServerSeisComP3(Client):
@@ -208,6 +211,34 @@ class ServerWindow(GridLayout):
             layout_central_bottom.add_widget(tab_alarms_layout)
 
             tab_PSD = TabbedPanelItem(text='PSD')
+
+            self.psd_layout = BoxLayout()
+            self.psd_fig, _ = plt.subplots()
+            self.auto_moving_x = True
+            self.auto_moving_y = True
+            self.psd_fig.clf()
+
+            self.psd_xmin = 0.001
+            self.psd_xmax = 1
+            self.psd_ymin = 0
+            self.psd_ymax = 1
+
+            self.psd_plot, = plt.plot(0, 0, figure=self.psd_fig)
+
+            self.psd_fig.axes[0].tick_params(axis='both', which='major', labelsize=14)
+            self.psd_fig.axes[0].tick_params(axis='both', which='minor', labelsize=14)
+
+            self.delta_x = self.psd_xmax - self.psd_xmin
+            self.psd_fig.axes[0].set_xlim(self.psd_xmin, self.psd_xmax)
+            self.psd_ymin, self.psd_ymax = self.psd_fig.axes[0].get_ylim()
+
+            self.psd_fig.canvas.draw()
+
+
+            # self.psd_figure = PSDFigure(t_figures=self.t_figures)
+            self.psd_layout.add_widget(self.psd_fig.canvas)
+            tab_PSD.add_widget(self.psd_layout)
+
             layout_central_bottom.add_widget(tab_PSD)
 
             self.add_widget(layout_central_bottom)
@@ -220,7 +251,7 @@ class ServerWindow(GridLayout):
             # self.endtime = UTCDateTime()
             # update_time_thread = ServerThread(self.update_time, 10)
             # self.get_data_thread = ServerThread(self.get_data, 10)
-            self.update_figures_thread = ServerThread(self.get_data, self.update_figures, dt=8)
+            self.update_figures_thread = ServerThread(self.get_data, self.update_figures, self.update_psd, dt=8)
 
             # on_selected_node_thread.start()
             # update_states_thread.start()
@@ -232,7 +263,7 @@ class ServerWindow(GridLayout):
             Clock.schedule_interval(self.on_selected_node, 0.5)
             Clock.schedule_interval(self.update_states, 30)
             Clock.schedule_interval(self.update_alarms, 30)
-            # Clock.schedule_interval(self.update_curves, 10)
+            Clock.schedule_interval(self.garbage_collect, 30)
 
     def on_release_t_curves(self, btn):
         # To update the number of stations in curves, we have to remove the widget and add it again just after
@@ -241,8 +272,11 @@ class ServerWindow(GridLayout):
 
         # self.get_data_thread.terminate()
         self.update_figures_thread.terminate()
+        del self.update_figures_thread
 
         self.t_curves.children[0].clear_widgets()
+        self.t_curves.clear_widgets()
+        del self.t_curves
         self.t_curves = t_curves_tab(self.stations_active_list, self.t_figures, client=self.client)
 
         # self.get_data_thread = ServerThread(self.get_data, 10)
@@ -271,15 +305,15 @@ class ServerWindow(GridLayout):
             for state in states_server_root.findall("./network[@name='{0}']/station[@name='{1}']/"
                                                     "state".format(self.state_network, self.state_station)):
                 self.states.append([state.attrib['name'], state.attrib['value'], int(state.attrib['problem'])])
+            del states_server, states_server_root
         except FileNotFoundError:
             pass
 
         self.state_layout.remove_widget(self.states_tree)
+        self.states_tree.clear_widgets()
+        del self.states_tree
         self.states_tree = StateTreeView(title='States of {}'.format(self.state_station), state_list=self.states)
         self.state_layout.add_widget(self.states_tree)
-
-    # def update_time(self, dt):
-    #     self.endtime = UTCDateTime()
 
     def get_data(self, endtime):
         for figure in self.t_figures:
@@ -289,18 +323,17 @@ class ServerWindow(GridLayout):
         for figure in self.t_figures:
             figure.update_figure(endtime)
 
-    # def update_curves(self, dt):
-    #     self.endtime = UTCDateTime()
-    #     Clock.schedule_once(self.get_data)
-    #     Clock.schedule_once(self.update_figures, 5)
-    #
-    # def get_data(self, dt):
-    #     for figure in self.t_figures:
-    #         figure.get_data_from_client(self.endtime)
-    #
-    # def update_figures(self, dt):
-    #     for figure in self.t_figures:
-    #         figure.update_figure(self.endtime)
+    def update_psd(self, dt):
+        self.psd_fig.clf()
+        for figure in self.t_figures:
+            plt.plot(figure.f, figure.psd, figure=self.psd_fig)
+
+        if len(self.t_figures) != 0:
+            self.psd_fig.axes[0].set_xlim(self.psd_xmin, self.psd_xmax)
+            self.psd_fig.axes[0].set_ylim(self.psd_ymin, self.psd_ymax)
+
+        self.psd_fig.canvas.draw()
+        self.psd_fig.canvas.flush_events()
 
     def update_alarms(self, dt):
         # nc_alarms_list: non-completed alarms list ; c_alarms_list: completed one
@@ -333,6 +366,7 @@ class ServerWindow(GridLayout):
                                  alarm_dt[12:14] + ':' + alarm_dt[14:]
 
                 self.c_alarms_list.append([alarm_datetime, alarm_name, alarm.attrib])
+            del alarms_server, alarms_server_root, alarm_name, alarm_dt, alarm_datetime
 
         except FileNotFoundError:
             pass
@@ -341,6 +375,10 @@ class ServerWindow(GridLayout):
 
         self.in_progress_scroll_layout.remove_widget(self.in_progress_alarms_tree)
         self.completed_scroll_layout.remove_widget(self.completed_alarms_tree)
+        self.in_progress_alarms_tree.clear_widgets()
+        self.completed_alarms_tree.clear_widgets()
+        del self.in_progress_alarms_tree
+        del self.completed_alarms_tree
 
         self.in_progress_alarms_tree = AlarmTreeView(title='Alarms in progress', alarms_list=self.nc_alarms_list,
                                                      check=True, check_list=self.nc_alarms_list_checked)
@@ -371,6 +409,10 @@ class ServerWindow(GridLayout):
 
         except FileNotFoundError:
             pass
+
+    def garbage_collect(self, dt):
+        print('GC_Start:', Process(getpid()).memory_info().rss / 1024 ** 2, 'MB')
+        gc.collect()
 
 
 class ServerThread(Thread):

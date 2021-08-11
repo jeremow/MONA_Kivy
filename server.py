@@ -213,10 +213,10 @@ class ServerWindow(GridLayout):
             tab_PSD = TabbedPanelItem(text='PSD')
 
             self.psd_layout = BoxLayout()
+            self.psd_layout.orientation = 'vertical'
             self.psd_fig, _ = plt.subplots()
             self.auto_moving_x = True
             self.auto_moving_y = True
-            self.psd_fig.clf()
 
             self.psd_xmin = 0.001
             self.psd_xmax = 1
@@ -230,7 +230,6 @@ class ServerWindow(GridLayout):
 
             self.delta_x = self.psd_xmax - self.psd_xmin
             self.psd_fig.axes[0].set_xlim(self.psd_xmin, self.psd_xmax)
-            self.psd_ymin, self.psd_ymax = self.psd_fig.axes[0].get_ylim()
 
             self.psd_fig.canvas.draw()
 
@@ -251,7 +250,7 @@ class ServerWindow(GridLayout):
             # self.endtime = UTCDateTime()
             # update_time_thread = ServerThread(self.update_time, 10)
             # self.get_data_thread = ServerThread(self.get_data, 10)
-            self.update_figures_thread = ServerThread(self.get_data, self.update_figures, self.update_psd, dt=8)
+            self.update_figures_thread = ServerThread(self.get_data, self.update_figures, dt=8)
 
             # on_selected_node_thread.start()
             # update_states_thread.start()
@@ -263,6 +262,7 @@ class ServerWindow(GridLayout):
             Clock.schedule_interval(self.on_selected_node, 0.5)
             Clock.schedule_interval(self.update_states, 30)
             Clock.schedule_interval(self.update_alarms, 30)
+            Clock.schedule_interval(self.update_psd, 10)
             Clock.schedule_interval(self.garbage_collect, 30)
 
     def on_release_t_curves(self, btn):
@@ -324,13 +324,16 @@ class ServerWindow(GridLayout):
             figure.update_figure(endtime)
 
     def update_psd(self, dt):
-        self.psd_fig.clf()
+        print(self.t_figures)
         for figure in self.t_figures:
-            plt.plot(figure.f, figure.psd, figure=self.psd_fig)
+            print('f :', figure.f)
+            print('psd :', figure.psd)
+            self.psd_plot.set_xdata(figure.f)
+            self.psd_plot.set_ydata(figure.psd)
 
         if len(self.t_figures) != 0:
             self.psd_fig.axes[0].set_xlim(self.psd_xmin, self.psd_xmax)
-            self.psd_fig.axes[0].set_ylim(self.psd_ymin, self.psd_ymax)
+            # self.psd_fig.axes[0].set_ylim(self.psd_ymin, self.psd_ymax)
 
         self.psd_fig.canvas.draw()
         self.psd_fig.canvas.flush_events()

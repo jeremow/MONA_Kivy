@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<server ip='rtserver.ipgp.fr' port='18000'>
+	<network name='G'>
+		<station name='FDFM'>
+			<channel location='00' name='BHZ'>
+			</channel>
+			<channel location='00' name='BHN'>
+			</channel>
+			<channel location='00' name='BHE'>
+			</channel>
+			<channel location='10' name='BHZ'>
+			</channel>
+			<channel location='10' name='BHN'>
+			</channel>
+			<channel location='10' name='BHE'>
+			</channel>
+		</station>
+	</network>
+</server>
